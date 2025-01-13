@@ -16,10 +16,15 @@ Este proyecto utiliza FastAPI, SQLAlchemy y Alembic para crear una API que permi
 git clone <URL_DEL_REPOSITORIO>
 
 ```
-2. Crea y activa un entorno virtual:
+2. Correr el Docker:
+
+
+migracion: docker exec backend-web-1 alembic upgrade head
 ```sh
-python -m venv .venv
-source .venv/bin/activate  # En Windows usa `.venv\Scripts\activate`
+
+
+
+
 
 ```
 3. Instala las dependencias:

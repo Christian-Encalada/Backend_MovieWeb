@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_USER=proyecto_ia
+      - DB_PASSWORD=Pucem.2024
+      - DB_HOST=proyecto-ia-pucem.postgres.database.azure.com
+      - DB_PORT=5432
+      - DB_NAME=postgres
+      - SSL_CERT=./ssl/DigiCertGlobalRootG2.crt.pem
+    volumes:
+      - .:/app
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

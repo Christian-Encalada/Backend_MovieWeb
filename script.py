@@ -12,11 +12,6 @@ def split_and_save_ratings():
     ratings_part1 = ratings.iloc[:half]
     ratings_part1.to_csv('datasets/ml-32m/ratings_nerff.csv', index=False)
 
-def split_and_save_links():
-    links = pd.read_csv('datasets/ml-32m/links.csv')
-    half = len(links) // 8
-    links_part1 = links.iloc[:half]
-    links_part1.to_csv('datasets/ml-32m/links_nerff.csv', index=False)
 
 def split_and_save_tags():
     tags = pd.read_csv('datasets/ml-32m/tags.csv')
@@ -28,5 +23,4 @@ def split_and_save_tags():
 
 split_and_save_movies()
 split_and_save_ratings()
-split_and_save_links()
 split_and_save_tags()

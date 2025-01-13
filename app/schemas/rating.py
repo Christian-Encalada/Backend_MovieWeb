@@ -1,3 +1,4 @@
+from typing import Optional
 from pydantic import BaseModel
 
 class RatingBase(BaseModel):
@@ -5,12 +6,11 @@ class RatingBase(BaseModel):
     rating: float
 
 class RatingCreate(RatingBase):
-    pass
+    user_id: Optional[int] = None
 
 class Rating(RatingBase):
-    id: int
-    user_id: int
+    rating_id: int
+    user_id: Optional[int]
 
     class Config:
-        from_attributes = True  # Renombrado de orm_mode en Pydantic v2
-        arbitrary_types_allowed = True  # Permitir tipos arbitrarios
+        from_attributes = True

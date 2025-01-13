@@ -27,14 +27,17 @@ config.set_main_option('sqlalchemy.url', DATABASE_URL)
 # This line sets up loggers basically.
 fileConfig(config.config_file_name)
 
+# Importar los modelos
+from app.database import Base
+from app.models.user import User
+from app.models.movie import Movie
+from app.models.rating import Rating
+from app.models.tag import Tag
+
 # add your model's MetaData object here
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-from app.database import Base
-from app.models.user import User
-from app.models.rating import Rating
-
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
