@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import user, movie, recommendations, favorite
+from app.routers import user, movie, recommendations, favorite, chat
 
 app = FastAPI()
 
@@ -25,6 +25,7 @@ app.include_router(user.router, prefix="/users", tags=["users"])
 app.include_router(movie.router, prefix="/movies", tags=["movies"])
 app.include_router(recommendations.router, prefix="/recommendations", tags=["recommendations"])
 app.include_router(favorite.router, prefix="/favorites", tags=["favorites"])
+app.include_router(chat.router, prefix="/chat", tags=["chat"])
 
 
 @app.get("/")
