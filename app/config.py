@@ -5,7 +5,7 @@ logger = logging.getLogger(__name__)
 
 class Settings(BaseSettings):
     # JWT settings
-    secret_key: str
+    secret_key: str  # Cambiado a minúsculas para coincidir con el .env
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 1440
     
@@ -25,11 +25,9 @@ class Settings(BaseSettings):
     def DATABASE_URL(self) -> str:
         return f"postgresql://{self.db_user}:{self.db_password}@{self.db_host}:{self.db_port}/{self.db_name}"
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        logger.info(f"Cargada SECRET_KEY: {self.secret_key[:5]}...")
-        logger.info(f"Algoritmo configurado: {self.algorithm}")
-
-    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
+    model_config = SettingsConfigDict(
+        env_file=".env", 
+        case_sensitive=False  # Esto es importante
+    )
 
 settings = Settings()

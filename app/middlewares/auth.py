@@ -60,17 +60,18 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
 async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
         token = credentials.credentials
-        logger.info(f"Verificando token: {token[:20]}...")
-        
+        print(f"Verificando token en middleware: {token[:20]}...")  # Debug
+        print(f"Usando SECRET_KEY: {settings.SECRET_KEY[:5]}...")  # Debug
+
         payload = jwt.decode(
             token,
             settings.SECRET_KEY,
             algorithms=[settings.ALGORITHM]
         )
-        logger.info(f"Token verificado exitosamente. Payload: {payload}")
+        print(f"Token verificado exitosamente")  # Debug
         return payload
     except JWTError as e:
-        logger.error(f"Error verificando token: {str(e)}")
+        print(f"Error verificando token: {str(e)}")  # Debug
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token inválido o expirado"

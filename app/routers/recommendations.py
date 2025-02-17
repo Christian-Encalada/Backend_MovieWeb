@@ -16,7 +16,7 @@ async def get_user_recommendations(
     db: Session = Depends(get_db)
 ):
     try:
-        logger.info(f"Obteniendo recomendaciones para usuario: {current_user.user_id}")
+        print(f"Usuario autenticado en recomendaciones: {current_user.user_id}")  # Debug
         recommendation_service = RecommendationService(db)
         recommendations = await recommendation_service.get_recommendations_for_user(current_user.user_id)
         
@@ -27,7 +27,7 @@ async def get_user_recommendations(
         logger.info(f"Se encontraron {len(recommendations)} recomendaciones")
         return recommendations
     except Exception as e:
-        logger.error(f"Error obteniendo recomendaciones: {str(e)}")
+        print(f"Error en recomendaciones: {str(e)}")  # Debug
         raise HTTPException(
             status_code=500,
             detail=str(e)
