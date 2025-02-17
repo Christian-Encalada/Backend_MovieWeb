@@ -5,12 +5,13 @@ from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from alembic import context
 from dotenv import load_dotenv
+from app.core.config import settings
 
 # Cargar variables de entorno desde el archivo .env
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 # Construir la URL de la base de datos
-DATABASE_URL = f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
+DATABASE_URL = f"postgresql://{settings.DB_USER}:{settings.DB_PASSWORD}@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}"
 
 # Añadir el directorio raíz del proyecto al sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'app')))
@@ -20,8 +21,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 # access to the values within the .ini file in use.
 config = context.config
 
-# Set the SQLAlchemy URL dynamically
-config.set_main_option('sqlalchemy.url', DATABASE_URL)
+# Establecer la URL de la base de datos en la configuración
+config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -33,6 +34,10 @@ from app.models.user import User
 from app.models.movie import Movie
 from app.models.rating import Rating
 from app.models.tag import Tag
+from app.models.user_preferred_genres import UserPreferredGenres
+from app.models.actor import Actor
+from app.models.movie_actors import MovieActor
+from app.models.favorite import Favorite
 
 # add your model's MetaData object here
 # for 'autogenerate' support

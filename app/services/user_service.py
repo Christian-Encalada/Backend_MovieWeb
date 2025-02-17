@@ -34,27 +34,27 @@ class UserService:
                 return None
             if not verify_password(password, user.password):
                 return None
-            
-            # Crear token de acceso
-            access_token = create_access_token(
-                data={"sub": str(user.user_id)}
+
+            token = create_access_token(
+                data={
+                    "sub": str(user.user_id),
+                    "username": user.username,
+                    "email": user.email
+                }
             )
-            
-            print(f"Generated token for user {user.user_id}: {access_token[:20]}...")
-            
+
             return {
-                "access_token": access_token,
+                "access_token": token,
                 "token_type": "Bearer",
                 "user": {
                     "user_id": user.user_id,
                     "username": user.username,
-                    "email": user.email,
-                    "favs": user.favs if user.favs is not None else []
+                    "email": user.email
                 }
             }
         except Exception as e:
             print(f"Error in authenticate_user: {str(e)}")
-            raise
+            return None
 
     def get_user_by_username(self, username: str):
         return self.db.query(UserModel).filter(UserModel.username == username).first()

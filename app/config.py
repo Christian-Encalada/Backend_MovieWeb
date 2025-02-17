@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     db_name: str
     ssl_cert: str
 
+    # TMDB settings
+    tmdb_api_key: str
+    tmdb_base_url: str = "https://api.themoviedb.org/3"
+
     @property
     def DATABASE_URL(self) -> str:
         return f"postgresql://{self.db_user}:{self.db_password}@{self.db_host}:{self.db_port}/{self.db_name}"

@@ -1,53 +1,88 @@
 from sqlalchemy.orm import Session
-from app.models.movie import Movie as MovieModel
-from app.models.user import User as UserModel
+from app.models.movie import Movie
+from app.models.favorite import Favorite
+from app.models.actor import Actor
+from app.models.movie_actors import MovieActor
 from collections import Counter
-from typing import List
-import random
+from app.services.tmdb_service import TMDBService
 
 class RecommendationService:
     def __init__(self, db: Session):
         self.db = db
+        self.tmdb_service = TMDBService()
 
-    def get_recommendations_for_user(self, user_id: int) -> List[MovieModel]:
+    async def get_recommendations_for_user(self, user_id: int) -> list[dict]:
         try:
-            # Obtener el usuario y sus favoritos
-            user = self.db.query(UserModel).filter(UserModel.user_id == user_id).first()
-            if not user or not user.favs:
-                # Si el usuario no tiene favoritos, devolver películas aleatorias
-                all_movies = self.db.query(MovieModel).all()
-                return random.sample(all_movies, min(10, len(all_movies)))
-
-            # Obtener las películas favoritas del usuario
-            fav_movies = self.db.query(MovieModel).filter(MovieModel.movie_id.in_(user.favs)).all()
+            # Obtener favoritos del usuario
+            favorites = self.db.query(Favorite).filter(Favorite.user_id == user_id).all()
             
-            # Recolectar todos los géneros de las películas favoritas
-            genre_counter = Counter()
-            for movie in fav_movies:
-                genres = movie.genres.split('|')
-                genre_counter.update(genres)
+            if not favorites:
+                return {
+                    "message": "No tienes preferencias aún. Agrega películas a favoritos para obtener recomendaciones personalizadas.",
+                    "movies": []
+                }
 
-            # Obtener los 3 géneros más frecuentes
-            top_genres = [genre for genre, _ in genre_counter.most_common(3)]
+            # Obtener géneros de las películas favoritas
+            favorite_genres = set()
+            favorite_actors = set()
+
+            for fav in favorites:
+                # Obtener detalles de la película de TMDB
+                movie_details = await self.tmdb_service.get_movie_details(fav.movie_id)
+                
+                # Agregar géneros
+                for genre in movie_details.get('genres', []):
+                    favorite_genres.add(genre['id'])
+                
+                # Agregar actores principales
+                credits = await self.tmdb_service.get_movie_credits(fav.movie_id)
+                for cast in credits.get('cast', [])[:3]:  # Top 3 actores
+                    favorite_actors.add(cast['id'])
+
+            # Obtener recomendaciones basadas en géneros y actores
+            recommendations = []
             
-            if not top_genres:
-                return []
+            # Obtener películas por géneros similares
+            for genre_id in favorite_genres:
+                genre_movies = await self.tmdb_service.discover_movies_by_genre(genre_id)
+                recommendations.extend(genre_movies)
 
-            # Buscar películas similares basadas en los géneros preferidos
-            # que no estén en los favoritos del usuario
-            recommended_movies = (
-                self.db.query(MovieModel)
-                .filter(
-                    MovieModel.movie_id.notin_(user.favs),  # Excluir favoritos
-                    MovieModel.genres.contains(top_genres[0])  # Debe contener al menos el género más común
-                )
-                .order_by(MovieModel.movie_id)  # Ordenar para consistencia
-                .limit(10)
-                .all()
-            )
+            # Obtener películas por actores
+            for actor_id in favorite_actors:
+                actor_movies = await self.tmdb_service.discover_movies_by_actor(actor_id)
+                recommendations.extend(actor_movies)
 
-            return recommended_movies
+            # Filtrar películas que ya están en favoritos
+            favorite_ids = {fav.movie_id for fav in favorites}
+            recommendations = [
+                movie for movie in recommendations 
+                if movie['id'] not in favorite_ids
+            ]
+
+            # Ordenar por popularidad y eliminar duplicados
+            seen_movies = set()
+            unique_recommendations = []
+            for movie in sorted(recommendations, key=lambda x: x['vote_average'], reverse=True):
+                if movie['id'] not in seen_movies:
+                    seen_movies.add(movie['id'])
+                    unique_recommendations.append({
+                        "movie_id": movie['id'],
+                        "title": movie['title'],
+                        "genres": "|".join(
+                            self.tmdb_service.genres_map.get(genre_id, "Unknown")
+                            for genre_id in movie.get('genre_ids', [])
+                        ),
+                        "poster_path": movie.get('poster_path'),
+                        "overview": movie.get('overview'),
+                        "release_date": movie.get('release_date'),
+                        "vote_average": movie.get('vote_average')
+                    })
+
+            return {
+                "message": "Recomendaciones basadas en tus favoritos",
+                "movies": unique_recommendations[:10]  # Retornar top 10
+            }
 
         except Exception as e:
             print(f"Error getting recommendations: {str(e)}")
-            return []
+            raise

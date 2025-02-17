@@ -2,13 +2,17 @@ from pydantic import BaseModel, EmailStr, constr, Field, validator
 from typing import List, Optional
 from datetime import datetime
 
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    user: dict
+
 class UserBase(BaseModel):
     username: str
     email: EmailStr
 
 class UserCreate(UserBase):
     password: str
-    favs: Optional[List[int]] = []
 
 class UserLogin(BaseModel):
     username: str
@@ -16,7 +20,6 @@ class UserLogin(BaseModel):
 
 class User(UserBase):
     user_id: int
-    favs: Optional[List[int]] = []
     created_at: datetime
 
     class Config:
@@ -39,11 +42,12 @@ class PasswordUpdate(BaseModel):
             raise ValueError('Las contraseñas no coinciden')
         return v
 
-    class Config:
-        json_schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "current_password": "contraseña_actual",
                 "new_password": "nueva_contraseña",
                 "confirm_password": "nueva_contraseña"
             }
         }
+    }

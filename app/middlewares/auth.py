@@ -1,7 +1,7 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-from app.core.security import SECRET_KEY, ALGORITHM
+from app.core.config import settings  # Importar settings
 from app.services.user_service import UserService
 from app.dependencies import get_db
 from sqlalchemy.orm import Session
@@ -20,36 +20,31 @@ async def get_current_user(
     )
 
     try:
-        print(f"Received token: {token[:20]}...")  # Debug log
+        print("Token recibido:", token[:20], "...")  # Log del token
         
-        # Decodificar el token
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(
+            token, 
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM]
+        )
+        print("Payload decodificado:", payload)  # Log del payload
+        
         user_id: str = payload.get("sub")
-        
         if user_id is None:
-            print("No user_id in token")  # Debug log
+            print("No se encontró user_id en el payload")
             raise credentials_exception
 
-        print(f"Token decoded, user_id: {user_id}")  # Debug log
-
-        # Obtener el usuario
         user = db.query(User).filter(User.user_id == int(user_id)).first()
-        
         if user is None:
-            print(f"No user found for id {user_id}")  # Debug log
+            print(f"No se encontró usuario con ID {user_id}")
             raise credentials_exception
 
-        # Asegurarse de que favs sea una lista
-        if user.favs is None:
-            user.favs = []
-            db.commit()
-
-        print(f"User authenticated: {user.user_id}, favs: {user.favs}")  # Debug log
+        print("Usuario autenticado:", user.user_id, user.username)  # Log del usuario
         return user
 
     except JWTError as e:
-        print(f"JWT Error: {str(e)}")  # Debug log
+        print("Error JWT:", str(e))
         raise credentials_exception
     except Exception as e:
-        print(f"Unexpected error: {str(e)}")  # Debug log
+        print("Error inesperado:", str(e))
         raise credentials_exception 
