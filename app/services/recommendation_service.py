@@ -5,84 +5,63 @@ from app.models.actor import Actor
 from app.models.movie_actors import MovieActor
 from collections import Counter
 from app.services.tmdb_service import TMDBService
+from typing import Dict
+from fastapi import HTTPException
 
 class RecommendationService:
     def __init__(self, db: Session):
         self.db = db
         self.tmdb_service = TMDBService()
 
-    async def get_recommendations_for_user(self, user_id: int) -> list[dict]:
+    async def get_recommendations_for_user(self, user_id: int) -> Dict:
         try:
             # Obtener favoritos del usuario
-            favorites = self.db.query(Favorite).filter(Favorite.user_id == user_id).all()
-            
+            favorites = (
+                self.db.query(Favorite)
+                .filter(Favorite.user_id == user_id)
+                .all()
+            )
+
             if not favorites:
-                return {
-                    "message": "No tienes preferencias aún. Agrega películas a favoritos para obtener recomendaciones personalizadas.",
-                    "movies": []
-                }
+                return {"movies": []}
 
-            # Obtener géneros de las películas favoritas
-            favorite_genres = set()
-            favorite_actors = set()
+            # Obtener recomendaciones basadas en los favoritos
+            all_recommendations = []
+            for favorite in favorites[:5]:  # Usar solo los últimos 5 favoritos
+                try:
+                    recommendations = await self.tmdb_service.get_movie_recommendations(favorite.movie_id)
+                    all_recommendations.extend(recommendations)
+                except Exception as e:
+                    print(f"Error getting recommendations for movie {favorite.movie_id}: {str(e)}")
+                    continue
 
-            for fav in favorites:
-                # Obtener detalles de la película de TMDB
-                movie_details = await self.tmdb_service.get_movie_details(fav.movie_id)
-                
-                # Agregar géneros
-                for genre in movie_details.get('genres', []):
-                    favorite_genres.add(genre['id'])
-                
-                # Agregar actores principales
-                credits = await self.tmdb_service.get_movie_credits(fav.movie_id)
-                for cast in credits.get('cast', [])[:3]:  # Top 3 actores
-                    favorite_actors.add(cast['id'])
-
-            # Obtener recomendaciones basadas en géneros y actores
-            recommendations = []
-            
-            # Obtener películas por géneros similares
-            for genre_id in favorite_genres:
-                genre_movies = await self.tmdb_service.discover_movies_by_genre(genre_id)
-                recommendations.extend(genre_movies)
-
-            # Obtener películas por actores
-            for actor_id in favorite_actors:
-                actor_movies = await self.tmdb_service.discover_movies_by_actor(actor_id)
-                recommendations.extend(actor_movies)
-
-            # Filtrar películas que ya están en favoritos
-            favorite_ids = {fav.movie_id for fav in favorites}
-            recommendations = [
-                movie for movie in recommendations 
-                if movie['id'] not in favorite_ids
-            ]
-
-            # Ordenar por popularidad y eliminar duplicados
+            # Eliminar duplicados y convertir al formato de nuestra API
             seen_movies = set()
             unique_recommendations = []
-            for movie in sorted(recommendations, key=lambda x: x['vote_average'], reverse=True):
-                if movie['id'] not in seen_movies:
-                    seen_movies.add(movie['id'])
+            
+            for movie in all_recommendations:
+                if movie["id"] not in seen_movies:
+                    seen_movies.add(movie["id"])
                     unique_recommendations.append({
-                        "movie_id": movie['id'],
-                        "title": movie['title'],
+                        "movie_id": movie["id"],
+                        "title": movie["title"],
                         "genres": "|".join(
                             self.tmdb_service.genres_map.get(genre_id, "Unknown")
-                            for genre_id in movie.get('genre_ids', [])
+                            for genre_id in movie.get("genre_ids", [])
                         ),
-                        "poster_path": movie.get('poster_path'),
-                        "overview": movie.get('overview'),
-                        "release_date": movie.get('release_date'),
-                        "vote_average": movie.get('vote_average')
+                        "poster_path": movie.get("poster_path"),
+                        "overview": movie.get("overview"),
+                        "release_date": movie.get("release_date"),
+                        "vote_average": movie.get("vote_average", 0)
                     })
 
             return {
-                "message": "Recomendaciones basadas en tus favoritos",
-                "movies": unique_recommendations[:10]  # Retornar top 10
+                "movies": unique_recommendations[:10]  # Devolver solo las 10 mejores recomendaciones
             }
 
         except Exception as e:
-            print(f"Error getting recommendations: {str(e)}")
-            raise
+            print(f"Error in get_recommendations_for_user: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error getting recommendations: {str(e)}"
+            )

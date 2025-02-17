@@ -3,6 +3,9 @@ from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from app.core.config import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Configuración
 SECRET_KEY = "tu_clave_secreta_muy_segura"  # Cambiar en producción
@@ -19,15 +22,20 @@ def get_password_hash(password: str) -> str:
 
 def create_access_token(data: dict) -> str:
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.utcnow() + timedelta(minutes=settings.access_token_expire_minutes)
     to_encode.update({"exp": expire})
+    
     try:
+        logger.info(f"Creando token con datos: {to_encode}")
+        logger.info(f"Usando SECRET_KEY: {settings.secret_key[:5]}...")
+        
         encoded_jwt = jwt.encode(
             to_encode, 
-            settings.SECRET_KEY, 
-            algorithm=settings.ALGORITHM
+            settings.secret_key,
+            algorithm=settings.algorithm
         )
+        logger.info(f"Token creado exitosamente: {encoded_jwt[:20]}...")
         return encoded_jwt
     except Exception as e:
-        print(f"Error creating token: {e}")
-        raise 
+        logger.error(f"Error creando token: {str(e)}")
+        raise e 

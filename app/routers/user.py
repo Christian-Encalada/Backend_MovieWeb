@@ -1,13 +1,12 @@
 from fastapi import APIRouter, HTTPException, Depends, status, Body
 from sqlalchemy.orm import Session
 from typing import List, Dict
-from app.schemas.user import User, UserCreate, UserLogin, Token
+from app.schemas.user import User, UserCreate, UserLogin, Token, UserUpdate, PasswordUpdate
 from app.services.user_service import UserService
 from app.dependencies import get_db, get_current_user
 from app.models.user import User as UserModel
-from app.utils.auth import get_password_hash
+from app.utils.auth import get_password_hash, verify_password
 from pydantic import BaseModel, validator, Field
-from app.core.security import verify_password
 from pydantic import EmailStr
 
 router = APIRouter()
@@ -56,16 +55,22 @@ async def register_user(user: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=Token)
 def login_user(user: UserLogin, db: Session = Depends(get_db)):
-    user_service = UserService(db)
-    auth_result = user_service.authenticate_user(user.username, user.password)
-    
-    if not auth_result:
+    try:
+        user_service = UserService(db)
+        auth_result = user_service.authenticate_user(user.username, user.password)
+        
+        if not auth_result:
+            raise HTTPException(
+                status_code=401,
+                detail="Usuario o contraseña incorrectos",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return auth_result
+    except Exception as e:
         raise HTTPException(
-            status_code=401,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
+            status_code=500,
+            detail=f"Error en el login: {str(e)}"
         )
-    return auth_result
 
 @router.get("/{user_id}", response_model=User)
 async def get_user(user_id: int, db: Session = Depends(get_db)):
@@ -131,27 +136,30 @@ async def remove_from_favorites(
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.put("/password")
+@router.patch("/password")
 async def update_password(
-    data: PasswordUpdateSchema,
+    password_update: PasswordUpdate,
     current_user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     try:
+        # Obtener usuario actual
+        user = db.query(UserModel).filter(UserModel.user_id == current_user.user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
         # Verificar contraseña actual
-        if not verify_password(data.current_password, current_user.password):
+        if not verify_password(password_update.current_password, user.password):
             raise HTTPException(status_code=400, detail="Contraseña actual incorrecta")
 
-        # Verificar que las nuevas contraseñas coincidan
-        if data.new_password != data.confirm_password:
-            raise HTTPException(status_code=400, detail="Las contraseñas no coinciden")
-
-        # Actualizar contraseña
-        current_user.password = get_password_hash(data.new_password)
+        # Las contraseñas nuevas ya fueron validadas por el modelo Pydantic
+        user.password = get_password_hash(password_update.new_password)
         db.commit()
 
-        return {"message": "Contraseña actualizada exitosamente"}
+        return {"message": "Contraseña actualizada correctamente"}
 
+    except HTTPException as e:
+        raise e
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -187,3 +195,56 @@ async def register_user_with_genres(
     
     db.commit()
     return db_user
+
+@router.patch("/profile")
+async def update_profile(
+    user_update: UserUpdate,
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    try:
+        user_service = UserService(db)
+        
+        # Validar que el username no esté vacío si se proporciona
+        if user_update.username is not None:
+            if not user_update.username.strip():
+                raise HTTPException(
+                    status_code=400, 
+                    detail="El nombre de usuario no puede estar vacío"
+                )
+            
+            try:
+                updated_user = user_service.update_user_profile(
+                    current_user.user_id, 
+                    user_update.username
+                )
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+            
+            if not updated_user:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Usuario no encontrado"
+                )
+                
+            return {
+                "message": "Perfil actualizado correctamente",
+                "user": {
+                    "id": updated_user.user_id,
+                    "username": updated_user.username,
+                    "email": updated_user.email
+                }
+            }
+        
+        raise HTTPException(
+            status_code=400,
+            detail="No se proporcionaron datos para actualizar"
+        )
+        
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error actualizando el perfil: {str(e)}"
+        )

@@ -1,9 +1,13 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict # type: ignore
+import logging
+
+logger = logging.getLogger(__name__)
 
 class Settings(BaseSettings):
-    SECRET_KEY: str = "tu_clave_secreta_aqui"
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    # JWT settings
+    secret_key: str
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 1440
     
     # Database settings
     db_user: str
@@ -21,6 +25,11 @@ class Settings(BaseSettings):
     def DATABASE_URL(self) -> str:
         return f"postgresql://{self.db_user}:{self.db_password}@{self.db_host}:{self.db_port}/{self.db_name}"
 
-    model_config = SettingsConfigDict(env_file=".env", extra="allow")
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        logger.info(f"Cargada SECRET_KEY: {self.secret_key[:5]}...")
+        logger.info(f"Algoritmo configurado: {self.algorithm}")
+
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 
 settings = Settings()

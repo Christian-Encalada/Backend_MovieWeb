@@ -25,6 +25,15 @@ class User(UserBase):
     class Config:
         from_attributes = True
 
+class UserUpdate(BaseModel):
+    username: Optional[str] = None
+
+    @validator('username')
+    def validate_username(cls, v):
+        if v is not None and not v.strip():
+            raise ValueError('El nombre de usuario no puede estar vacío')
+        return v.strip() if v else None
+
 class PasswordUpdate(BaseModel):
     current_password: str
     new_password: str
