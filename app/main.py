@@ -22,6 +22,7 @@ app.include_router(user.router, prefix="/users", tags=["users"])
 app.include_router(movie.router, prefix="/movies", tags=["movies"])
 app.include_router(recommendations.router, prefix="/recommendations", tags=["recommendations"])
 
+
 @app.get("/")
 async def root():
     return {"message": "Welcome to the Movie Recommendation API"}

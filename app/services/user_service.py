@@ -118,3 +118,15 @@ class UserService:
                 self.db.commit()
                 self.db.refresh(user)
         return user
+
+    def update_password(self, user_id: int, current_password: str, new_password: str) -> bool:
+        user = self.get_user(user_id)
+        if not user:
+            return False
+        
+        if not verify_password(current_password, user.password):
+            return False
+        
+        user.password = get_password_hash(new_password)
+        self.db.commit()
+        return True
