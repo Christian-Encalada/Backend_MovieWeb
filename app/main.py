@@ -4,12 +4,13 @@ from app.routers import user, movie, recommendations, favorite, chat
 
 app = FastAPI()
 
-# Configuración de CORS
+# Configuración de CORS actualizada
 origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "http://localhost:5173",  # Para Vite
-    "http://127.0.0.1:5173",  # Para Vite
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://*.vercel.app",  # Permitir dominios de Vercel
 ]
 
 app.add_middleware(
