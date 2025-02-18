@@ -5,7 +5,7 @@
       "src": "api/index.py",
       "use": "@vercel/python",
       "config": {
-        "runtime": "python3.9"
+        "runtime": "python3.12"
       }
     }
   ],
@@ -16,7 +16,7 @@
     }
   ],
   "env": {
-    "PYTHON_VERSION": "3.9",
+    "PYTHON_VERSION": "3.12",
     "STAGE": "api"
   }
 }
