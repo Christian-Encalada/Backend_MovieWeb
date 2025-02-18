@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Optional
 import logging
 
 logger = logging.getLogger(__name__)
@@ -21,7 +22,7 @@ class Settings(BaseSettings):
     tmdb_base_url: str = "https://api.themoviedb.org/3"
 
     # SSL settings
-    ssl_cert: str | None = None
+    ssl_cert: Optional[str] = None
 
     @property
     def DATABASE_URL(self) -> str:
@@ -30,7 +31,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=False,
-        env_file_encoding='utf-8'
+        env_file_encoding='utf-8',
+        extra='ignore'
     )
 
 settings = Settings()
