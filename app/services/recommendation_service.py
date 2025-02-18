@@ -1,53 +1,67 @@
 from sqlalchemy.orm import Session
-from app.models.movie import Movie as MovieModel
-from app.models.user import User as UserModel
+from app.models.movie import Movie
+from app.models.favorite import Favorite
+from app.models.actor import Actor
+from app.models.movie_actors import MovieActor
 from collections import Counter
-from typing import List
-import random
+from app.services.tmdb_service import TMDBService
+from typing import Dict
+from fastapi import HTTPException
 
 class RecommendationService:
     def __init__(self, db: Session):
         self.db = db
+        self.tmdb_service = TMDBService()
 
-    def get_recommendations_for_user(self, user_id: int) -> List[MovieModel]:
+    async def get_recommendations_for_user(self, user_id: int) -> Dict:
         try:
-            # Obtener el usuario y sus favoritos
-            user = self.db.query(UserModel).filter(UserModel.user_id == user_id).first()
-            if not user or not user.favs:
-                # Si el usuario no tiene favoritos, devolver películas aleatorias
-                all_movies = self.db.query(MovieModel).all()
-                return random.sample(all_movies, min(10, len(all_movies)))
-
-            # Obtener las películas favoritas del usuario
-            fav_movies = self.db.query(MovieModel).filter(MovieModel.movie_id.in_(user.favs)).all()
-            
-            # Recolectar todos los géneros de las películas favoritas
-            genre_counter = Counter()
-            for movie in fav_movies:
-                genres = movie.genres.split('|')
-                genre_counter.update(genres)
-
-            # Obtener los 3 géneros más frecuentes
-            top_genres = [genre for genre, _ in genre_counter.most_common(3)]
-            
-            if not top_genres:
-                return []
-
-            # Buscar películas similares basadas en los géneros preferidos
-            # que no estén en los favoritos del usuario
-            recommended_movies = (
-                self.db.query(MovieModel)
-                .filter(
-                    MovieModel.movie_id.notin_(user.favs),  # Excluir favoritos
-                    MovieModel.genres.contains(top_genres[0])  # Debe contener al menos el género más común
-                )
-                .order_by(MovieModel.movie_id)  # Ordenar para consistencia
-                .limit(10)
+            # Obtener favoritos del usuario
+            favorites = (
+                self.db.query(Favorite)
+                .filter(Favorite.user_id == user_id)
                 .all()
             )
 
-            return recommended_movies
+            if not favorites:
+                return {"movies": []}
+
+            # Obtener recomendaciones basadas en los favoritos
+            all_recommendations = []
+            for favorite in favorites[:5]:  # Usar solo los últimos 5 favoritos
+                try:
+                    recommendations = await self.tmdb_service.get_movie_recommendations(favorite.movie_id)
+                    all_recommendations.extend(recommendations)
+                except Exception as e:
+                    print(f"Error getting recommendations for movie {favorite.movie_id}: {str(e)}")
+                    continue
+
+            # Eliminar duplicados y convertir al formato de nuestra API
+            seen_movies = set()
+            unique_recommendations = []
+            
+            for movie in all_recommendations:
+                if movie["id"] not in seen_movies:
+                    seen_movies.add(movie["id"])
+                    unique_recommendations.append({
+                        "movie_id": movie["id"],
+                        "title": movie["title"],
+                        "genres": "|".join(
+                            self.tmdb_service.genres_map.get(genre_id, "Unknown")
+                            for genre_id in movie.get("genre_ids", [])
+                        ),
+                        "poster_path": movie.get("poster_path"),
+                        "overview": movie.get("overview"),
+                        "release_date": movie.get("release_date"),
+                        "vote_average": movie.get("vote_average", 0)
+                    })
+
+            return {
+                "movies": unique_recommendations[:10]  # Devolver solo las 10 mejores recomendaciones
+            }
 
         except Exception as e:
-            print(f"Error getting recommendations: {str(e)}")
-            return []
+            print(f"Error in get_recommendations_for_user: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error getting recommendations: {str(e)}"
+            )

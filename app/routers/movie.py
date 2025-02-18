@@ -10,6 +10,9 @@ from app.models.user import User
 from app.models.movie import Movie as MovieModel
 from collections import Counter
 import random
+from app.services.tmdb_service import TMDBService
+import requests
+from app.services.recommendation_service import RecommendationService
 
 router = APIRouter()
 
@@ -26,17 +29,74 @@ async def get_all_movies(db: Session = Depends(get_db)):
 
 @router.get("/search", response_model=List[Movie])
 async def search_movies(
-    term: str = Query(..., description="Término de búsqueda", min_length=1),
+    term: str = Query(..., min_length=2),
     db: Session = Depends(get_db)
 ):
-    movie_service = MovieService(db)
-    movies = movie_service.search_movies_by_title(term)
-    return movies
+    try:
+        tmdb_service = TMDBService()
+        movies = await tmdb_service.search_movies(term)
+        
+        # Agregar log para debug
+        print(f"TMDB search results: {movies[:2]}")  # Solo mostramos los primeros 2 resultados
+        
+        # Convertir resultados de TMDB al formato de nuestra API
+        return [
+            {
+                "movie_id": movie["id"],
+                "title": movie["title"],
+                "genres": "|".join(
+                    tmdb_service.genres_map.get(genre_id, "Unknown")
+                    for genre_id in movie.get("genre_ids", [])
+                ),
+                "poster_path": movie.get("poster_path"),
+                "overview": movie.get("overview"),
+                "release_date": movie.get("release_date"),
+                "vote_average": movie.get("vote_average")
+            }
+            for movie in movies
+        ]
+    except Exception as e:
+        print(f"Error in search_movies: {str(e)}")  # Log del error
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error searching movies: {str(e)}"
+        )
 
-@router.get("/genre/{genre}", response_model=List[Movie])
-async def get_movies_by_genre(genre: str, db: Session = Depends(get_db)):
-    movie_service = MovieService(db)
-    return movie_service.get_movies_by_genre(genre)
+@router.get("/genre/{genre_id}", response_model=List[Movie])
+async def get_movies_by_genre(
+    genre_id: int,
+    page: int = Query(1, ge=1),
+    db: Session = Depends(get_db)
+):
+    try:
+        tmdb_service = TMDBService()
+        movies_data = await tmdb_service.discover_movies_by_genre(genre_id, page)
+        
+        # Convertir resultados de TMDB al formato de nuestra API
+        movies = [
+            {
+                "movie_id": movie["id"],
+                "title": movie["title"],
+                "genres": "|".join(
+                    tmdb_service.genres_map.get(genre_id, "Unknown")
+                    for genre_id in movie.get("genre_ids", [])
+                ),
+                "poster_path": movie.get("poster_path"),
+                "overview": movie.get("overview"),
+                "release_date": movie.get("release_date"),
+                "vote_average": movie.get("vote_average", 0)
+            }
+            for movie in movies_data["results"]
+        ]
+        
+        return movies
+
+    except Exception as e:
+        print(f"Error getting movies by genre: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting movies by genre: {str(e)}"
+        )
 
 @router.get("/ratings/movie/{movie_id}")
 async def get_movie_ratings(movie_id: int, db: Session = Depends(get_db)):
@@ -45,19 +105,59 @@ async def get_movie_ratings(movie_id: int, db: Session = Depends(get_db)):
 
 @router.get("/{movie_id}", response_model=Movie)
 async def get_movie(movie_id: int, db: Session = Depends(get_db)):
-    movie_service = MovieService(db)
-    movie = movie_service.get_movie_by_id(movie_id)
-    if not movie:
-        raise HTTPException(status_code=404, detail="Movie not found")
-    return movie
+    try:
+        # Primero intentar obtener de TMDB
+        tmdb_service = TMDBService()
+        movie_details = await tmdb_service.get_movie_details(movie_id)
+        
+        if not movie_details:
+            raise HTTPException(status_code=404, detail="Movie not found")
+            
+        # Convertir al formato de nuestra API
+        return {
+            "movie_id": movie_details["id"],
+            "title": movie_details["title"],
+            "genres": "|".join(
+                genre["name"]
+                for genre in movie_details.get("genres", [])
+            ),
+            "poster_path": movie_details.get("poster_path"),
+            "overview": movie_details.get("overview"),
+            "release_date": movie_details.get("release_date"),
+            "vote_average": movie_details.get("vote_average", 0)
+        }
+        
+    except Exception as e:
+        print(f"Error getting movie details: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/{movie_id}/similar", response_model=List[Movie])
 async def get_similar_movies(movie_id: int, db: Session = Depends(get_db)):
-    movie_service = MovieService(db)
-    similar_movies = movie_service.get_similar_movies(movie_id)
-    if not similar_movies:
-        raise HTTPException(status_code=404, detail="No similar movies found")
-    return similar_movies
+    try:
+        tmdb_service = TMDBService()
+        movies = await tmdb_service.get_movie_recommendations(movie_id)
+        
+        return [
+            {
+                "movie_id": movie["id"],
+                "title": movie["title"],
+                "genres": "|".join(
+                    tmdb_service.genres_map.get(genre_id, "Unknown")
+                    for genre_id in movie.get("genre_ids", [])
+                ),
+                "poster_path": movie.get("poster_path"),
+                "overview": movie.get("overview"),
+                "release_date": movie.get("release_date"),
+                "vote_average": movie.get("vote_average")
+            }
+            for movie in movies
+        ]
+    except Exception as e:
+        print(f"Error getting recommendations: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting movie recommendations: {str(e)}"
+        )
 
 @router.put("/{movie_id}", response_model=Movie)
 async def update_movie(movie_id: int, movie: MovieCreate, db: Session = Depends(get_db)):
@@ -80,50 +180,18 @@ async def get_recommendations_by_favorites(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Get personalized movie recommendations for the authenticated user.
-    
-    - **current_user**: Automatically obtained from the JWT token
-    - Returns a list of recommended movies based on user's favorites
-    """
     try:
-        print(f"User ID: {current_user.user_id}")  # Debug log
-        print(f"User favs: {current_user.favs}")   # Debug log
-
-        # Si el usuario no tiene favoritos o favs es None
-        if not current_user.favs or current_user.favs is None:
-            print("No favorites found, returning random movies")  # Debug log
-            all_movies = db.query(MovieModel).limit(10).all()
-            return [movie.to_dict() for movie in all_movies]
-
-        # Obtener las películas favoritas del usuario
-        fav_movies = db.query(MovieModel).filter(MovieModel.movie_id.in_(current_user.favs)).all()
-        print(f"Found {len(fav_movies)} favorite movies")  # Debug log
+        recommendation_service = RecommendationService(db)
+        recommendations = await recommendation_service.get_recommendations_for_user(current_user.user_id)
         
-        if not fav_movies:
-            print("No favorite movies found in database")  # Debug log
-            all_movies = db.query(MovieModel).limit(10).all()
-            return [movie.to_dict() for movie in all_movies]
-
-        # Obtener películas similares basadas en el primer favorito
-        recommended = (
-            db.query(MovieModel)
-            .filter(MovieModel.movie_id.notin_(current_user.favs))
-            .limit(10)
-            .all()
-        )
-
-        print(f"Found {len(recommended)} recommendations")  # Debug log
-        return [movie.to_dict() for movie in recommended]
+        if not recommendations["movies"]:
+            return []
+        
+        return recommendations["movies"]
 
     except Exception as e:
-        print(f"Error in recommendations: {str(e)}")  # Debug log
+        print(f"Error in recommendations: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/search")
-async def search_movies(title: str, db: Session = Depends(get_db)):
-    movies = db.query(Movie).filter(Movie.title.ilike(f"%{title}%")).limit(5).all()
-    return movies
 
 @router.get("/top-rated", response_model=List[Movie])
 async def get_top_rated_movies(limit: int = 10, db: Session = Depends(get_db)):
@@ -134,3 +202,15 @@ async def get_top_rated_movies(limit: int = 10, db: Session = Depends(get_db)):
         .all()
     )
     return movies
+
+@router.get("/{movie_id}/videos")
+async def get_movie_videos(movie_id: int):
+    try:
+        tmdb_service = TMDBService()
+        video = await tmdb_service.get_movie_videos(movie_id)
+        return video
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting movie videos: {str(e)}"
+        )
