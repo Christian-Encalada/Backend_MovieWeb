@@ -38,5 +38,5 @@ async def root():
 async def health_check():
     return {"status": "ok"}
 
-# Handler para Vercel
+# Handler para Vercel con configuración específica
 handler = Mangum(app, lifespan="off")
