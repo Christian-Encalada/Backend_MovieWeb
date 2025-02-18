@@ -23,20 +23,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Montar los routers
-app.include_router(user.router, prefix="/api/users", tags=["users"])
-app.include_router(movie.router, prefix="/api/movies", tags=["movies"])
-app.include_router(recommendations.router, prefix="/api/recommendations", tags=["recommendations"])
-app.include_router(favorite.router, prefix="/api/favorites", tags=["favorites"])
-app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
+# Montar los routers sin el prefijo /api ya que Vercel lo maneja diferente
+app.include_router(user.router, prefix="/users", tags=["users"])
+app.include_router(movie.router, prefix="/movies", tags=["movies"])
+app.include_router(recommendations.router, prefix="/recommendations", tags=["recommendations"])
+app.include_router(favorite.router, prefix="/favorites", tags=["favorites"])
+app.include_router(chat.router, prefix="/chat", tags=["chat"])
 
-@app.get("/api")
+@app.get("/")
 async def root():
     return {"message": "Welcome to the Movie Recommendation API"}
 
-@app.get("/api/health")
+@app.get("/health")
 async def health_check():
     return {"status": "ok"}
 
-# Handler for Vercel
+# Handler para Vercel
 handler = Mangum(app, lifespan="off")

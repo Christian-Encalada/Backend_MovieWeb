@@ -13,7 +13,6 @@
     }
   ],
   "env": {
-    "PYTHON_VERSION": "3.11",
-    "APP_MODULE": "api.index:handler"
+    "PYTHON_VERSION": "3.11"
   }
 }
