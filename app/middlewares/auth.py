@@ -1,55 +1,78 @@
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer, HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
-from app.core.security import SECRET_KEY, ALGORITHM
-from app.services.user_service import UserService
-from app.dependencies import get_db
-from sqlalchemy.orm import Session
+from app.config import settings
 from app.models.user import User
+from sqlalchemy.orm import Session
+from app.dependencies import get_db
+import logging
+
+logger = logging.getLogger(__name__)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="users/login")
 
-async def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
-):
+security = HTTPBearer()
+
+async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-
+    
     try:
-        print(f"Received token: {token[:20]}...")  # Debug log
+        # Agregar logs para debug
+        print(f"Token recibido: {token[:20]}...")
         
-        # Decodificar el token
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: str = payload.get("sub")
+        payload = jwt.decode(
+            token, 
+            settings.secret_key, 
+            algorithms=[settings.algorithm]
+        )
+        print(f"Payload decodificado: {payload}")  # Debug
         
+        user_id = payload.get("sub")
         if user_id is None:
-            print("No user_id in token")  # Debug log
+            raise credentials_exception
+            
+        # Convertir user_id a int
+        try:
+            user_id = int(user_id)
+        except ValueError:
+            print(f"Error convirtiendo user_id: {user_id}")
             raise credentials_exception
 
-        print(f"Token decoded, user_id: {user_id}")  # Debug log
-
-        # Obtener el usuario
-        user = db.query(User).filter(User.user_id == int(user_id)).first()
-        
+        user = db.query(User).filter(User.user_id == user_id).first()
         if user is None:
-            print(f"No user found for id {user_id}")  # Debug log
+            print(f"Usuario no encontrado para ID: {user_id}")
             raise credentials_exception
 
-        # Asegurarse de que favs sea una lista
-        if user.favs is None:
-            user.favs = []
-            db.commit()
-
-        print(f"User authenticated: {user.user_id}, favs: {user.favs}")  # Debug log
+        print(f"Usuario autenticado: {user.user_id} - {user.username}")
         return user
-
+        
     except JWTError as e:
-        print(f"JWT Error: {str(e)}")  # Debug log
+        print(f"Error JWT: {str(e)}")
         raise credentials_exception
     except Exception as e:
-        print(f"Unexpected error: {str(e)}")  # Debug log
+        print(f"Error inesperado: {str(e)}")
         raise credentials_exception 
+
+async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        token = credentials.credentials
+        print(f"Verificando token en middleware: {token[:20]}...")  # Debug
+        print(f"Usando SECRET_KEY: {settings.SECRET_KEY[:5]}...")  # Debug
+
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM]
+        )
+        print(f"Token verificado exitosamente")  # Debug
+        return payload
+    except JWTError as e:
+        print(f"Error verificando token: {str(e)}")  # Debug
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token inválido o expirado"
+        ) 

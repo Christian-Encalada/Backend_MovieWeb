@@ -1,5 +1,7 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 from app.database import Base
 
 class User(Base):
@@ -9,4 +11,12 @@ class User(Base):
     username = Column(String, unique=True, index=True)
     email = Column(String, unique=True, index=True)
     password = Column(String)
-    favs = Column(JSONB, nullable=True, server_default='[]')
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relaciones
+    favorites = relationship("Favorite", back_populates="user", cascade="all, delete-orphan")
+    preferred_genres = relationship(
+        "UserPreferredGenres",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
