@@ -1,14 +1,15 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-import os
+from app.config import settings
 
-DATABASE_URL = f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
+# Configuración de la URL de la base de datos con SSL
+DATABASE_URL = settings.DATABASE_URL
+if settings.db_host.endswith('.azure.com'):  # Si es Azure
+    DATABASE_URL = f"{DATABASE_URL}?sslmode=require"
 
-engine = create_engine(DATABASE_URL, connect_args={"sslmode": "require"})
-
+engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
 Base = declarative_base()
 
 # Función para obtener la base de datos

@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     # JWT settings
     secret_key: str  # Cambiado a minúsculas para coincidir con el .env
     algorithm: str = "HS256"
-    access_token_expire_minutes: int = 1440
+    access_token_expire_minutes: int = 60 * 24  # 24 horas
     
     # Database settings
     db_user: str
@@ -15,11 +15,13 @@ class Settings(BaseSettings):
     db_host: str
     db_port: str
     db_name: str
-    ssl_cert: str
 
     # TMDB settings
     tmdb_api_key: str
     tmdb_base_url: str = "https://api.themoviedb.org/3"
+
+    # SSL settings
+    ssl_cert: str | None = None  # Hacemos el campo opcional
 
     @property
     def DATABASE_URL(self) -> str:
