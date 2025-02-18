@@ -1,11 +1,11 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict # type: ignore
+from pydantic_settings import BaseSettings, SettingsConfigDict
 import logging
 
 logger = logging.getLogger(__name__)
 
 class Settings(BaseSettings):
     # JWT settings
-    secret_key: str  # Cambiado a minúsculas para coincidir con el .env
+    secret_key: str
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24  # 24 horas
     
@@ -21,15 +21,16 @@ class Settings(BaseSettings):
     tmdb_base_url: str = "https://api.themoviedb.org/3"
 
     # SSL settings
-    ssl_cert: str | None = None  # Hacemos el campo opcional
+    ssl_cert: str | None = None
 
     @property
     def DATABASE_URL(self) -> str:
         return f"postgresql://{self.db_user}:{self.db_password}@{self.db_host}:{self.db_port}/{self.db_name}"
 
     model_config = SettingsConfigDict(
-        env_file=".env", 
-        case_sensitive=False  # Esto es importante
+        env_file=".env",
+        case_sensitive=False,
+        env_file_encoding='utf-8'
     )
 
 settings = Settings()
