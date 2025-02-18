@@ -1,9 +1,13 @@
+import os
 from mangum import Mangum
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import user, movie, recommendations, favorite, chat
 
-app = FastAPI()
+stage = os.environ.get('STAGE', None)
+root_path = f"/{stage}" if stage else "/"
+
+app = FastAPI(root_path=root_path)
 
 # Configuración de CORS
 origins = [
@@ -23,7 +27,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Montar los routers sin el prefijo /api ya que Vercel lo maneja diferente
+# Montar los routers
 app.include_router(user.router, prefix="/users", tags=["users"])
 app.include_router(movie.router, prefix="/movies", tags=["movies"])
 app.include_router(recommendations.router, prefix="/recommendations", tags=["recommendations"])
@@ -38,5 +42,5 @@ async def root():
 async def health_check():
     return {"status": "ok"}
 
-# Handler para Vercel con configuración específica
-handler = Mangum(app, lifespan="off")
+# Handler para Vercel
+handler = Mangum(app)
