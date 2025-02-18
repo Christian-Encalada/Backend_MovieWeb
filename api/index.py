@@ -1,4 +1,5 @@
+from mangum import Mangum
 from app.main import app
 
-# Necesario para Vercel
-export_app = app 
+# Create handler for AWS Lambda / Vercel
+handler = Mangum(app, lifespan="off")
