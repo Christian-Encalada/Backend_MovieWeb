@@ -5,14 +5,14 @@ from app.routers import user, movie, recommendations, favorite, chat
 
 app = FastAPI()
 
-# Configuración de CORS
+# Configuración de CORS actualizada
 origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "https://*.vercel.app",
-    "*"
+    "https://frontend-movie-web.vercel.app",  # Agrega tu dominio de producción
+    "https://*.vercel.app"  # Permite todos los subdominios de vercel.app
 ]
 
 app.add_middleware(
@@ -21,6 +21,8 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600
 )
 
 # Montar los routers
@@ -39,4 +41,4 @@ async def health_check():
     return {"status": "ok"}
 
 # Handler for Vercel
-handler = Mangum(app, lifespan="off")
+handler = Mangum(app)
