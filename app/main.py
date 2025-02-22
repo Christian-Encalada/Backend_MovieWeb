@@ -11,7 +11,8 @@ origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "https://*.vercel.app",
-    "*"  # Temporarily allow all origins for testing
+    "https://fronted-movie-web-git-main-christian-encaladas-projects.vercel.app",
+    "https://cinexpress.vercel.app"  # Temporarily allow all origins for testing
 ]
 
 app.add_middleware(

@@ -10,7 +10,8 @@ origins = [
     "http://127.0.0.1:3000",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "https://fronted-movie-web.vercel.app"  # Tu frontend en Vercel
+    "https://fronted-movie-web-git-main-christian-encaladas-projects.vercel.app",
+    "https://cinexpress.vercel.app"  # Tu frontend en Vercel
 ]
 
 app.add_middleware(
