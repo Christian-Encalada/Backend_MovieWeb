@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import user, movie, recommendations, favorite, chat
 
-app = FastAPI(root_path="/api")
+app = FastAPI()
 
 # Configuración de CORS actualizada para Vercel
 origins = [
